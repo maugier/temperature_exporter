@@ -1,0 +1,5 @@
+listen = "127.0.0.1:1234"
+port = "COM5"
+
+[devices]
+"01823CE7" = "office"

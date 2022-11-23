@@ -1,0 +1,13 @@
+[package]
+name = "temperature_exporter"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# enocean = { git = "https://github.com/maugier/enocean/"}
+enocean = { path = "../enocean" }
+toml = "0.5.9"
+warp = "0.3.3"
+prometheus-client = "0.18.1"
