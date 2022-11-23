@@ -34,7 +34,7 @@ impl TemperatureStore {
     }
 
     pub fn scrape(&mut self) -> String {
-        let mut scrape = format!("# HELP enocean_temperature_celsius Temperature reported by an EnOcean sensor, in°C\n");
+        let mut scrape = format!("# HELP enocean_temperature_celsius Temperature reported by an EnOcean sensor, in °C\n");
         scrape += &format!("# TYPE enocean_temperature_celsius gauge\n");
 
         for (address, (name, point)) in self.devices.iter() {
@@ -43,9 +43,9 @@ impl TemperatureStore {
                 let address = address.to_string();
                 scrape += &
                     if let Some(name) = name {
-                        format!("enocean_temperature_celsius{{address=\"{address}\", name=\"{name}\"}} {temp} {time}")
+                        format!("enocean_temperature_celsius{{address=\"{address}\", name=\"{name}\"}} {temp} {time}\n")
                     } else {
-                        format!("enocean_temperature_celsius{{address=\"{address}\"}} {temp} {time}")
+                        format!("enocean_temperature_celsius{{address=\"{address}\"}} {temp} {time}\n")
                     }
             }
         }
@@ -69,6 +69,7 @@ fn main() -> Result<()> {
     let store = Arc::new(Mutex::new(store));
     
     let port = Port::open(port_name)?;
+    eprintln!("Port {port_name} opened.");
 
     let driver_store = store.clone();
     let driver = std::thread::spawn(move || { serial_driver_thread(port, driver_store)});
@@ -80,7 +81,6 @@ fn main() -> Result<()> {
         println!("{}", store.lock().unwrap().scrape());
     }
 
-    Ok(())
 }
 
 fn serial_driver_thread(mut port: Port, store: Arc<Mutex<TemperatureStore>>) {
