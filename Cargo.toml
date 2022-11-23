@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 # enocean = { git = "https://github.com/maugier/enocean/"}
 enocean = { path = "../enocean" }
-toml = "0.5.9"
 warp = "0.3.3"
 prometheus-client = "0.18.1"
+yaml-rust = "0.4.5"
+

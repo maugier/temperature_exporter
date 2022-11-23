@@ -1,6 +1,6 @@
-use std::{collections::HashMap, error::Error, fs::File, io::Read, sync::{Arc, Mutex, mpsc::{channel, Sender}}, thread::JoinHandle, time::{SystemTime, UNIX_EPOCH}};
+use std::{collections::HashMap, error::Error, fs::File, io::Read, sync::{Arc, Mutex}, thread::JoinHandle, time::{SystemTime, UNIX_EPOCH}};
 use enocean::{packet::{Address, Packet, RadioErp1}, port::Port, enocean::Rorg};
-use toml::Value;
+use yaml_rust::{Yaml, YamlLoader};
 
 
 type DeviceName = String;
@@ -17,11 +17,11 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 impl TemperatureStore {
     pub fn new() -> Self { Self::default() }
 
-    pub fn with_devices(config_devices: &toml::value::Table) -> Result<Self> {
+    pub fn with_devices(config_devices: &yaml_rust::yaml::Hash) -> Result<Self> {
         let mut devices = HashMap::new();
         for (address, name) in config_devices.iter() {
             let name = name.as_str().ok_or("device name was not string")?.to_owned();            
-            let address = address.parse()?;
+            let address = address.as_str().ok_or("device address was not a string")?.parse()?;
             devices.insert(address, (Some(name), None));
         }
         Ok(Self { devices })
@@ -57,13 +57,12 @@ impl TemperatureStore {
 
 fn main() -> Result<()> {
     let mut config_file = String::new();
-    File::open("temperature_exporter.toml")?.read_to_string(&mut config_file)?;
-    let config: Value = config_file.parse()?;
-    let config = config.as_table().ok_or("config wasn't a table")?;
+    File::open("temperature_exporter.yaml")?.read_to_string(&mut config_file)?;
+    let config: Yaml = YamlLoader::load_from_str(&config_file)?.into_iter().next().unwrap();
 
     let port_name = config["port"].as_str().ok_or("port name not found in config")?;
     let listen = config["listen"].as_str().ok_or("listen was not a string")?;
-    let devices = config["devices"].as_table().ok_or("devices is not a table")?;
+    let devices = config["devices"].as_hash().ok_or("devices is not a table")?;
 
     let store = TemperatureStore::with_devices(devices)?;
     let store = Arc::new(Mutex::new(store));
