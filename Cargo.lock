@@ -119,7 +119,7 @@ dependencies = [
 [[package]]
 name = "enocean"
 version = "0.2.56"
-source = "git+https://github.com/maugier/enocean/#afc696795f380b9ae4c5b44967b71ed38db6f315"
+source = "git+https://github.com/maugier/enocean/#3eb85c8489478a7801545e65001a9b53ae243279"
 dependencies = [
  "hex",
  "num_enum",
