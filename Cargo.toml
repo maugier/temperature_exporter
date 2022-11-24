@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# enocean = { git = "https://github.com/maugier/enocean/"}
-enocean = { path = "../enocean" }
+enocean = { git = "https://github.com/maugier/enocean/"}
+# enocean = { path = "../enocean" }
 warp = "0.3.3"
 yaml-rust = "0.4.5"
 tokio = { version = "1.22.0", features = ["rt","macros"] }
