@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     fs::File, io::Read,
     sync::{Arc, Mutex},
-    time::{SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH, Duration},
     net::SocketAddr};
 use enocean::{packet::{Address, Packet}, port::Port, enocean::Rorg};
 use warp::Filter;
@@ -16,6 +16,7 @@ type Timestamp = SystemTime;
 
 #[derive(Debug,Default)]
 struct TemperatureStore {
+    expire: Duration,
     devices: HashMap<Address, (Option<DeviceName>, Option<(Temperature, Timestamp)>)>,
 }
 
@@ -23,14 +24,14 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 impl TemperatureStore {
 
-    pub fn with_devices(config_devices: &yaml_rust::yaml::Hash) -> Result<Self> {
+    pub fn with_devices(expire: Duration, config_devices: &yaml_rust::yaml::Hash) -> Result<Self> {
         let mut devices = HashMap::new();
         for (address, name) in config_devices.iter() {
             let name = name.as_str().ok_or("device name was not string")?.to_owned();            
             let address = address.as_str().ok_or("device address was not a string")?.parse()?;
             devices.insert(address, (Some(name), None));
         }
-        Ok(Self { devices })
+        Ok(Self { expire, devices })
     }
 
     pub fn insert(&mut self, address: Address, temperature: Temperature, timestamp: SystemTime) {
@@ -45,13 +46,15 @@ impl TemperatureStore {
 
         for (address, (name, point)) in self.devices.iter() {
             if let Some((temp, time)) = point {
-                let time = time.duration_since(UNIX_EPOCH).expect("Time went backwards").as_millis();
+                let now = SystemTime::now();
+                if (now.duration_since(*time).expect("Time went backwards")) > self.expire { continue }
+                //let time = time.duration_since(UNIX_EPOCH).expect("Time went backwards").as_millis();
                 let address = address.to_string();
                 scrape += &
                     if let Some(name) = name {
-                        format!("enocean_temperature_celsius{{address=\"{address}\", name=\"{name}\"}} {temp} {time}\n")
+                        format!("enocean_temperature_celsius{{address=\"{address}\", name=\"{name}\"}} {temp}\n")
                     } else {
-                        format!("enocean_temperature_celsius{{address=\"{address}\"}} {temp} {time}\n")
+                        format!("enocean_temperature_celsius{{address=\"{address}\"}} {temp}\n")
                     }
             }
         }
@@ -71,7 +74,9 @@ async fn main() -> Result<()> {
     let listen: SocketAddr = config["listen"].as_str().ok_or("listen was not a string")?.parse()?;
     let devices = config["devices"].as_hash().ok_or("devices is not a table")?;
 
-    let store = TemperatureStore::with_devices(devices)?;
+    let expire = Duration::from_secs(3600);
+
+    let store = TemperatureStore::with_devices(expire, devices)?;
     let store = Arc::new(Mutex::new(store));
     
     let port = Port::open(port_name)?;
