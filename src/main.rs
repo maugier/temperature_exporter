@@ -118,5 +118,5 @@ fn serial_driver_thread(mut port: Port, store: Arc<Mutex<TemperatureStore>>) {
 }
 
 fn decode_temperature(byte: u8) -> f64 {
-    40f64 - (byte as f64 * 40f64 / 255f64)
+    40f64 - (byte as f64 * 80f64 / 255f64).round() / 2f64
 }
