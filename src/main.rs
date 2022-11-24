@@ -1,6 +1,13 @@
-use std::{collections::HashMap, error::Error, fs::File, io::Read, sync::{Arc, Mutex}, thread::JoinHandle, time::{SystemTime, UNIX_EPOCH}};
-use enocean::{packet::{Address, Packet, RadioErp1}, port::Port, enocean::Rorg};
+use std::{
+    collections::HashMap,
+    fs::File, io::Read,
+    sync::{Arc, Mutex},
+    time::{SystemTime, UNIX_EPOCH},
+    net::SocketAddr};
+use enocean::{packet::{Address, Packet}, port::Port, enocean::Rorg};
+use warp::Filter;
 use yaml_rust::{Yaml, YamlLoader};
+use tokio::runtime::Handle;
 
 
 type DeviceName = String;
@@ -15,7 +22,6 @@ struct TemperatureStore {
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 impl TemperatureStore {
-    pub fn new() -> Self { Self::default() }
 
     pub fn with_devices(config_devices: &yaml_rust::yaml::Hash) -> Result<Self> {
         let mut devices = HashMap::new();
@@ -55,13 +61,14 @@ impl TemperatureStore {
 
 }
 
-fn main() -> Result<()> {
+#[tokio::main(flavor="current_thread")]
+async fn main() -> Result<()> {
     let mut config_file = String::new();
     File::open("temperature_exporter.yaml")?.read_to_string(&mut config_file)?;
     let config: Yaml = YamlLoader::load_from_str(&config_file)?.into_iter().next().unwrap();
 
     let port_name = config["port"].as_str().ok_or("port name not found in config")?;
-    let listen = config["listen"].as_str().ok_or("listen was not a string")?;
+    let listen: SocketAddr = config["listen"].as_str().ok_or("listen was not a string")?.parse()?;
     let devices = config["devices"].as_hash().ok_or("devices is not a table")?;
 
     let store = TemperatureStore::with_devices(devices)?;
@@ -71,14 +78,23 @@ fn main() -> Result<()> {
     eprintln!("Port {port_name} opened.");
 
     let driver_store = store.clone();
-    let driver = std::thread::spawn(move || { serial_driver_thread(port, driver_store)});
+    Handle::current().spawn_blocking(move || { serial_driver_thread(port, driver_store)} );
 
+    let home = format!("<html><body><h1>EnOcean Temperature exporter</h1><ul><li>port {port_name}</li><li><a href=\"/metrics\">metrics</a></li></ul></body></html>");
+    let home: &'static str = Box::leak(home.into_boxed_str());
+
+    let filter = warp::path!("metrics").map(move || store.lock().unwrap().scrape())
+             .or(warp::path!().map(move || { warp::reply::html(home) }));
+
+    Ok(warp::serve(filter).run(listen).await)
+
+    /*
     let mut tick = String::new();
-
     loop {
         std::io::stdin().read_line(&mut tick)?;
         println!("{}", store.lock().unwrap().scrape());
     }
+    */
 
 }
 
